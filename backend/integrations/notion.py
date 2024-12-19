@@ -19,6 +19,7 @@ CLIENT_SECRET = os.getenv('NOTION_CLIENT_SECRET')
 encoded_client_id_secret = base64.b64encode(f'{CLIENT_ID}:{CLIENT_SECRET}'.encode()).decode()
 
 REDIRECT_URI = 'http://localhost:8000/integrations/notion/oauth2callback'
+
 authorization_url = f'https://api.notion.com/v1/oauth/authorize?client_id={CLIENT_ID}&response_type=code&owner=user&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fintegrations%2Fnotion%2Foauth2callback'
 
 async def authorize_notion(user_id, org_id):
@@ -78,6 +79,7 @@ async def oauth2callback_notion(request: Request):
 
 async def get_notion_credentials(user_id, org_id):
     credentials = await get_value_redis(f'notion_credentials:{org_id}:{user_id}')
+    print("82.Crdentials : " , credentials)
     if not credentials:
         raise HTTPException(status_code=400, detail='No credentials found.')
     credentials = json.loads(credentials)
@@ -110,18 +112,21 @@ def create_integration_item_metadata_object(
 ) -> IntegrationItem:
     """creates an integration metadata object from the response"""
     name = _recursive_dict_search(response_json['properties'], 'content')
+    print("115.name:", name)
     parent_type = (
         ''
         if response_json['parent']['type'] is None
         else response_json['parent']['type']
     )
+    print("121.parent_type:", parent_type)
+
     if response_json['parent']['type'] == 'workspace':
         parent_id = None
     else:
         parent_id = (
             response_json['parent'][parent_type]
         )
-
+    print("129 json: ",response_json)
     name = _recursive_dict_search(response_json, 'content') if name is None else name
     name = 'multi_select' if name is None else name
     name = response_json['object'] + ' ' + name
@@ -134,12 +139,13 @@ def create_integration_item_metadata_object(
         last_modified_time=response_json['last_edited_time'],
         parent_id=parent_id,
     )
-
+    print("142. integration_item_metadata:",integration_item_metadata)
     return integration_item_metadata
 
 async def get_items_notion(credentials) -> list[IntegrationItem]:
     """Aggregates all metadata relevant for a notion integration"""
     credentials = json.loads(credentials)
+    print("148, credentials:", credentials)
     response = requests.post(
         'https://api.notion.com/v1/search',
         headers={
@@ -150,11 +156,16 @@ async def get_items_notion(credentials) -> list[IntegrationItem]:
 
     if response.status_code == 200:
         results = response.json()['results']
+        print('160.[result]  : ', results)
         list_of_integration_item_metadata = []
         for result in results:
             list_of_integration_item_metadata.append(
                 create_integration_item_metadata_object(result)
             )
 
-        print(list_of_integration_item_metadata)
+        print("167. integeration_item_metadata: ",             
+              list_of_integration_item_metadata, )
+        print("170 : COmplete data")
+        for items in list_of_integration_item_metadata:
+            print(items)        
     return
